@@ -2,6 +2,7 @@ package centralizedmain;
 
 //the list of imports
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import logist.LogistSettings;
@@ -13,6 +14,7 @@ import logist.agent.Agent;
 import logist.config.Parsers;
 import logist.simulation.Vehicle;
 import logist.plan.Plan;
+import logist.plan.Action;
 import logist.task.Task;
 import logist.task.TaskDistribution;
 import logist.task.TaskSet;
@@ -32,6 +34,28 @@ public class CentralizedMain implements CentralizedBehavior {
     private Agent agent;
     private long timeout_setup;
     private long timeout_plan;
+    
+    private class CentralizedSolution {
+    	private HashMap<Action, Action> nextAction;
+    	private HashMap<Vehicle, Action> nextActionVehicle;
+    	private HashMap<Action, Integer> time;
+    	private HashMap<Action, Vehicle> vehicle;
+    	
+    	public Action nextAction(Action task) { return nextAction.get(task);}
+    	public Action nextAction(Vehicle vehicle) { return nextActionVehicle.get(vehicle);}
+    	public int time(Action task) { return time.get(task);}
+    	public Vehicle vehicle(Action task) { return vehicle.get(task);}
+    	
+    	public CentralizedSolution(HashMap<Action, Action> initNextAction, 
+    			HashMap<Vehicle, Action> initNextActionVehicle, 
+    			HashMap<Action, Integer> initTime, 
+    			HashMap<Action, Vehicle> initVehicle) {
+    		nextAction = initNextAction;
+    		nextActionVehicle = initNextActionVehicle;
+    		time = initTime;
+    		vehicle = initVehicle;
+    	}
+    }
     
     @Override
     public void setup(Topology topology, TaskDistribution distribution,
@@ -101,9 +125,45 @@ public class CentralizedMain implements CentralizedBehavior {
         return plan;
     }
     
-    private Plan selectInitialSolution(Vehicle vehicle, TaskSet tasks) {
-    	City current = vehicle.getCurrentCity();
-    	Plan plan = new Plan(current);
-    	return plan;
+    private CentralizedSolution selectInitialSolution(List<Vehicle> vehicles, TaskSet tasks) {
+    	HashMap<Action, Action> nextAction = new HashMap<Action,Action>();
+    	HashMap<Vehicle, Action> nextActionVehicle = new HashMap<Vehicle,Action>();
+    	HashMap<Action, Integer> time = new HashMap<Action,Integer>();
+    	HashMap<Action, Vehicle> vehicle = new HashMap<Action,Vehicle>();
+    	
+    	Vehicle biggestVehicle = vehicles.get(0);
+    	for(Vehicle vhcl: vehicles) {
+    		if(vhcl.capacity() > biggestVehicle.capacity()) {
+    			biggestVehicle = vhcl;
+    		}
+    	}
+    	
+    	Task firstTask = tasks.iterator().next();
+    	Action firstAction = new Action.Pickup(firstTask);
+    	Action secondAction = new Action.Delivery(firstTask);
+    	nextActionVehicle.put(biggestVehicle, firstAction);
+    	nextAction.put(firstAction, secondAction);
+    	time.put(firstAction, 1);
+    	time.put(secondAction, 2);
+    	vehicle.put(firstAction, biggestVehicle);
+    	vehicle.put(secondAction, biggestVehicle);
+    	tasks.remove(firstTask);
+
+    	int counter = 2;
+    	Action lastAction = secondAction;
+    	for(Task task: tasks) {
+    		Action action1 = new Action.Pickup(task);
+    		Action action2 = new Action.Delivery(task);
+        	nextAction.put(lastAction, action1);
+        	nextAction.put(action1, action2);
+    		time.put(action1, counter);
+    		time.put(action2, counter+1);
+    		vehicle.put(action1, biggestVehicle);
+    		vehicle.put(action2, biggestVehicle);
+    		lastAction = action2;
+    		counter += 2;
+    	}
+    	
+    	return new CentralizedSolution(nextAction, nextActionVehicle, time, vehicle);
     }
 }
