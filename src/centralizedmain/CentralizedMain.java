@@ -46,6 +46,15 @@ public class CentralizedMain implements CentralizedBehavior {
     	public int time(Action task) { return time.get(task);}
     	public Vehicle vehicle(Action task) { return vehicle.get(task);}
     	
+    	public void addAction(Action current, Action next) { nextAction.put(current, next);}
+    	public void addAction(Vehicle vehicle, Action action) { nextActionVehicle.put(vehicle, action);}
+    	public void addTime(Action action, int x) { time.put(action, x);}
+    	public void addVehicle(Action action, Vehicle vhcl) { vehicle.put(action, vhcl);}
+    	
+    	public CentralizedSolution() {
+    		
+    	}
+    	
     	public CentralizedSolution(HashMap<Action, Action> initNextAction, 
     			HashMap<Vehicle, Action> initNextActionVehicle, 
     			HashMap<Action, Integer> initTime, 
@@ -112,7 +121,7 @@ public class CentralizedMain implements CentralizedBehavior {
 
             plan.appendPickup(task);
 
-            // move: pickup location => delivery location
+            // move: pickup location => pickup location
             for (City city : task.path()) {
                 plan.appendMove(city);
             }
@@ -120,17 +129,12 @@ public class CentralizedMain implements CentralizedBehavior {
             plan.appendDelivery(task);
 
             // set current city
-            current = task.deliveryCity;
+            current = task.pickupCity;
         }
         return plan;
     }
     
     private CentralizedSolution selectInitialSolution(List<Vehicle> vehicles, TaskSet tasks) {
-    	HashMap<Action, Action> nextAction = new HashMap<Action,Action>();
-    	HashMap<Vehicle, Action> nextActionVehicle = new HashMap<Vehicle,Action>();
-    	HashMap<Action, Integer> time = new HashMap<Action,Integer>();
-    	HashMap<Action, Vehicle> vehicle = new HashMap<Action,Vehicle>();
-    	
     	Vehicle biggestVehicle = vehicles.get(0);
     	for(Vehicle vhcl: vehicles) {
     		if(vhcl.capacity() > biggestVehicle.capacity()) {
@@ -138,32 +142,43 @@ public class CentralizedMain implements CentralizedBehavior {
     		}
     	}
     	
+    	CentralizedSolution solution = new CentralizedSolution();
     	Task firstTask = tasks.iterator().next();
-    	Action firstAction = new Action.Pickup(firstTask);
-    	Action secondAction = new Action.Delivery(firstTask);
-    	nextActionVehicle.put(biggestVehicle, firstAction);
-    	nextAction.put(firstAction, secondAction);
-    	time.put(firstAction, 1);
-    	time.put(secondAction, 2);
-    	vehicle.put(firstAction, biggestVehicle);
-    	vehicle.put(secondAction, biggestVehicle);
+    	
+    	Action pickup = new Action.Pickup(firstTask);
+    	Action delivery = new Action.Delivery(firstTask);
+    	
+    	solution.addAction(biggestVehicle, pickup);
+    	solution.addAction(pickup, delivery);
+    	
+    	solution.addTime(pickup, 1);
+    	solution.addTime(delivery, 2);
+    	
+    	solution.addVehicle(pickup, biggestVehicle);
+    	solution.addVehicle(delivery, biggestVehicle);
+    	
     	tasks.remove(firstTask);
 
     	int counter = 2;
-    	Action lastAction = secondAction;
+    	Action lastAction = delivery;
+    	
     	for(Task task: tasks) {
     		Action action1 = new Action.Pickup(task);
     		Action action2 = new Action.Delivery(task);
-        	nextAction.put(lastAction, action1);
-        	nextAction.put(action1, action2);
-    		time.put(action1, counter);
-    		time.put(action2, counter+1);
-    		vehicle.put(action1, biggestVehicle);
-    		vehicle.put(action2, biggestVehicle);
-    		lastAction = action2;
+        	
+    		solution.addAction(lastAction, action1);
+        	solution.addAction(action1, action2);
+        	
+        	solution.addTime(action1, counter);
+        	solution.addTime(action2, counter+1);
+        	
+        	solution.addVehicle(action1, biggestVehicle);
+        	solution.addVehicle(action2, biggestVehicle);
+    		
+        	lastAction = action2;
     		counter += 2;
     	}
     	
-    	return new CentralizedSolution(nextAction, nextActionVehicle, time, vehicle);
+    	return solution;
     }
 }
